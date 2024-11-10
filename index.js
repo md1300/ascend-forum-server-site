@@ -1,7 +1,7 @@
 const express = require('express')
 require('dotenv').config()
 const cors = require('cors')
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, Timestamp } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 5000
 
@@ -41,6 +41,7 @@ async function run() {
 // ---------------- collection -------------------
     const db = client.db('ascend_forum')
     const postsCollection=db.collection('posts')
+    const usersCollection=db.collection('users')
 
 
     // -------------------get all post from postsCollection db ---------------
@@ -55,6 +56,21 @@ async function run() {
       const result= await postsCollection.insertOne(postInfo)
       res.send(result)
      })
+
+    //  ------------ post users information in usersCollection db ------------
+
+    app.put('/users',async(req,res)=>{
+      const userInfo=req.body;
+      const query={email:userInfo.email}
+      const isExist=await usersCollection.findOne(query)
+      if(isExist) return 
+      const options = { upsert: true }
+      const updateDoc={
+        $set:{...userInfo,timestamp:new Date()}
+      }
+      const result=await usersCollection.updateOne(query,updateDoc,options)
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
