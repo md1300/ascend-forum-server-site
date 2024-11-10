@@ -6,8 +6,8 @@ const app = express()
 const port = process.env.PORT || 5000
 
 
-const corsOption={
-  origin: ['http://localhost:5173', 
+const corsOption = {
+  origin: ['http://localhost:5173',
     'http://localhost:5174',
     'https://ascend-forum-8917c.web.app'],
   credentials: true,
@@ -38,37 +38,103 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-// ---------------- collection -------------------
+    // ---------------- collection -------------------
     const db = client.db('ascend_forum')
-    const postsCollection=db.collection('posts')
-    const usersCollection=db.collection('users')
+    const postsCollection = db.collection('posts')
+    const usersCollection = db.collection('users')
 
 
     // -------------------get all post from postsCollection db ---------------
-      app.get('/posts',async(req,res)=>{
-        const result=await postsCollection.find().toArray()
-        res.send(result)
-      })
+    app.get('/posts', async (req, res) => {
+
+      const post_time = new Date('post_time');
+     
+      const pipeline = [       
+          {
+            $addFields: {
+              post_time_date: {
+                $dateFromString: {
+                  dateString: "$post_time", 
+                  format: "%d/%m/%Y"        
+                }
+              }
+            }
+          },
+          {
+            
+            $sort: {
+              post_time_date: -1  
+            }
+          },
+          {
+           
+            $project: {
+              post_time_date: 0
+            }
+          }
+        
+      ]
+      const result = await postsCollection.aggregate(pipeline).toArray()
+      res.send(result)
+    })
+
+    // ---------------get specific user post from postsCollection ------------------
+
+    app.get('/posts/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { 'author.email': email }
+      const pipeline = [
+        {
+          $match: {
+            'author.email': email
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            post_Title: 1,
+            totalCount: { $add: ["$upVote", "$downVote"] }
+          },
+        },
+
+      ]
+      const result = await postsCollection.aggregate(pipeline).toArray()
+      res.send(result)
+    })
+
     // -----------------post userPost in postsCollection db ------------------
 
-    app.post('/posts',async(req,res)=>{
-      const postInfo=req.body;
-      const result= await postsCollection.insertOne(postInfo)
+    app.post('/posts', async (req, res) => {
+      const postData = req.body;
+      const postInfo = {
+        ...postData,
+        post_time: new Date().toLocaleDateString()
+      }
+      const result = await postsCollection.insertOne(postInfo)
       res.send(result)
-     })
+    })
+
+    //  ------------ get users information from usersColllection db ----------
+
+    app.get('/users/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await usersCollection.findOne(query)
+      res.send(result)
+    })
 
     //  ------------ post users information in usersCollection db ------------
 
-    app.put('/users',async(req,res)=>{
-      const userInfo=req.body;
-      const query={email:userInfo.email}
-      const isExist=await usersCollection.findOne(query)
-      if(isExist) return 
+    app.put('/users', async (req, res) => {
+      const userInfo = req.body;
+      const query = { email: userInfo.email }
+      const isExist = await usersCollection.findOne(query)
+      if (isExist) return
       const options = { upsert: true }
-      const updateDoc={
-        $set:{...userInfo,timestamp:new Date()}
+      const updateDoc = {
+        $set: { ...userInfo, timestamp: new Date() }
       }
-      const result=await usersCollection.updateOne(query,updateDoc,options)
+      const result = await usersCollection.updateOne(query, updateDoc, options)
       res.send(result)
     })
 
