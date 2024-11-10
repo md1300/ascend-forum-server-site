@@ -14,7 +14,7 @@ const corsOption={
   optionSuccessStatus: 200,
 }
 
-app.use(express())
+app.use(express.json())
 app.use(cors(corsOption))
 
 app.get('/', (req, res) => {
@@ -40,12 +40,21 @@ async function run() {
     await client.connect();
 // ---------------- collection -------------------
     const db = client.db('ascend_forum')
-    const postsCollection=db.collection(posts)
+    const postsCollection=db.collection('posts')
 
 
-    // -----------------post user post in postsCollection db ------------------
+    // -------------------get all post from postsCollection db ---------------
+      app.get('/posts',async(req,res)=>{
+        const result=await postsCollection.find().toArray()
+        res.send(result)
+      })
+    // -----------------post userPost in postsCollection db ------------------
 
- 
+    app.post('/posts',async(req,res)=>{
+      const postInfo=req.body;
+      const result= await postsCollection.insertOne(postInfo)
+      res.send(result)
+     })
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
