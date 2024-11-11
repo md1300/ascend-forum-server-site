@@ -1,7 +1,7 @@
 const express = require('express')
 require('dotenv').config()
 const cors = require('cors')
-const { MongoClient, ServerApiVersion, Timestamp } = require('mongodb');
+const { MongoClient, ServerApiVersion, Timestamp, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 5000
 
@@ -44,16 +44,23 @@ async function run() {
     const usersCollection = db.collection('users')
 
 
+    // ----------------- get a post data details ----------------
+
+    app.get('/post-details/:id',async(req,res)=>{
+         const id=req.params.id;
+         const query={_id:new ObjectId(id)}
+         const result=await postsCollection.findOne(query)
+         res.send(result)
+    })
+
+
     // -------------------get all post from postsCollection db ---------------
     app.get('/posts', async (req, res) => {
       const page=parseInt(req.query.page);
       const size=parseInt(req.query.size);
-      // console.log({page,size})
-
+      
       const post_time = new Date('post_time');
 
-    
-     
       const pipeline = [
         {
           $addFields: {
@@ -85,6 +92,20 @@ async function run() {
         }
       ];
 
+
+      const result = await postsCollection.aggregate(pipeline).toArray()
+      
+      const totalCount=await postsCollection.countDocuments()
+      
+   
+  
+      res.send({result,totalCount,})
+     
+     
+    })
+
+    // ---------------get all popular data in sort of popularity ------------
+    app.get('/popularity',async(req,res)=>{
       const totalVotepipeline=[
         {
           $addFields: {
@@ -94,36 +115,13 @@ async function run() {
           {
           $sort: { voteDifference: -1 }
           }
-          
-      ]
-
-      const result = await postsCollection.aggregate(pipeline).toArray()
-      
-      const totalCount=await postsCollection.countDocuments()
-      
-     
-      console.log(result)
-      res.send({result,totalCount,})
-     
-     
+        ]
+        const totalVoteResult= await postsCollection.aggregate(totalVotepipeline).toArray()
+        // console.log({totalVoteResult})
+        res.send(totalVoteResult)
+        // -------------------------------
+   
     })
-
-    // ---------------get all popular data in sort of popularity ------------
-    // app.get('/popularity',async(req,res)=>{
-    //   const totalVotepipeline=[
-    //     {
-    //       $addFields: {
-    //       voteDifference: { $subtract: ["$upVote", "$downVote"] }
-    //       }
-    //       },
-    //       {
-    //       $sort: { voteDifference: -1 }
-    //       }
-    //     ]
-    //     const totalVoteResult= await postsCollection.aggregate(totalVotepipeline).toArray()
-    //     console.log({totalVoteResult})
-    //     res.send(totalVoteResult)
-    // })
     // ---------------get specific user post from postsCollection ------------------
 
     app.get('/posts/:email', async (req, res) => {
