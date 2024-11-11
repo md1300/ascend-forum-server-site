@@ -48,6 +48,7 @@ async function run() {
 
     app.get('/post-details/:id',async(req,res)=>{
          const id=req.params.id;
+         console.log(id)
          const query={_id:new ObjectId(id)}
          const result=await postsCollection.findOne(query)
          res.send(result)
@@ -58,6 +59,9 @@ async function run() {
     app.get('/posts', async (req, res) => {
       const page=parseInt(req.query.page);
       const size=parseInt(req.query.size);
+      
+      const search=req.query.search;
+     
       
       const post_time = new Date('post_time');
 
@@ -72,10 +76,18 @@ async function run() {
             },
           }
         },
-       
+        // ---------------------------------------------
+        {
+          $match:{
+            $or:[
+              {category: { $regex: search, $options: 'i' } },            
+            ]
+          }
+        },
+      //  -------------------------------------------------------
         {
           $sort: {
-            post_time_date: -1,  // Sort by post_time_date descending
+            post_time_date: -1,  
             
           }
         },
@@ -87,19 +99,21 @@ async function run() {
         },
         {
           $project: {
-            post_time_date: 0  // Exclude post_time_date from the final output
+            post_time_date: 0  
           }
         }
       ];
 
+      
+
 
       const result = await postsCollection.aggregate(pipeline).toArray()
-      
+     
       const totalCount=await postsCollection.countDocuments()
       
    
   
-      res.send({result,totalCount,})
+      res.send({result,totalCount})
      
      
     })
