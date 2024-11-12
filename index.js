@@ -3,7 +3,7 @@ require('dotenv').config()
 const cors = require('cors')
 const { MongoClient, ServerApiVersion, Timestamp, ObjectId } = require('mongodb');
 const app = express()
-const port = process.env.PORT || 5000
+const port = process.env.PORT || 8000
 
 
 const corsOption = {
@@ -42,27 +42,29 @@ async function run() {
     const db = client.db('ascend_forum')
     const postsCollection = db.collection('posts')
     const usersCollection = db.collection('users')
+    const commentsCollection = db.collection('comments')
+    const voteCountsCollection = db.collection('voteCounts')
 
 
     // ----------------- get a post data details ----------------
 
-    app.get('/post-details/:id',async(req,res)=>{
-         const id=req.params.id;
-         console.log(id)
-         const query={_id:new ObjectId(id)}
-         const result=await postsCollection.findOne(query)
-         res.send(result)
+    app.get('/post-details/:id', async (req, res) => {
+      const id = req.params.id;
+      // console.log(id)
+      const query = { _id: new ObjectId(id) }
+      const result = await postsCollection.findOne(query)
+      res.send(result)
     })
 
 
     // -------------------get all post from postsCollection db ---------------
     app.get('/posts', async (req, res) => {
-      const page=parseInt(req.query.page);
-      const size=parseInt(req.query.size);
-      
-      const search=req.query.search;
-     
-      
+      const page = parseInt(req.query.page) || 1;
+      const size = parseInt(req.query.size) || 5;
+
+      const search = req.query.search || '';
+      const category = req.query.category || '';
+      // console.log({ search, category })
       const post_time = new Date('post_time');
 
       const pipeline = [
@@ -78,63 +80,88 @@ async function run() {
         },
         // ---------------------------------------------
         {
-          $match:{
-            $or:[
-              {category: { $regex: search, $options: 'i' } },            
+          $match: {
+            $or: [
+              { category: { $regex: search, $options: 'i' } },
+                                            
+
             ]
           }
         },
-      //  -------------------------------------------------------
+        //  -------------------------------------------------------
         {
           $sort: {
-            post_time_date: -1,  
-            
+            post_time_date: -1,
+
           }
         },
         {
-          $skip:(page-1)*size
+          $skip: (page - 1) * size
         },
         {
-          $limit:size
+          $limit: size
         },
         {
           $project: {
-            post_time_date: 0  
+            post_time_date: 0
           }
-        }
+        },
+
+        {
+          $match: {
+            $or: [
+              { category: { $regex: category, $options: 'i' } },
+              
+            ]
+          }
+        },
+
+
       ];
 
-      
-
-
+     
       const result = await postsCollection.aggregate(pipeline).toArray()
-     
-      const totalCount=await postsCollection.countDocuments()
-      
-   
-  
-      res.send({result,totalCount})
-     
-     
-    })
+      // const searchResult = await postsCollection.aggregate(searchPipeline).toArray()
 
+      const totalCount = await postsCollection.countDocuments()
+
+      // console.log(result.length)
+
+      res.send({ result, totalCount })
+
+
+    })
+    // -------------------------store vote information in voteCountsCollection --------
+
+   app.post('/voteCount',async(req,res)=>{
+    const voteInfo=req.body;
+    const result=await voteCountsCollection.insertOne(voteInfo)
+    res.send(result) 
+   })
+
+    // ----------------------------store comment data in commentsCollection ------------
+    app.post('/comment',async(req,res)=>{        
+         const commentData=req.body ;        
+         const result=await commentsCollection.insertOne(commentData)
+         res.send(result)
+    })
     // ---------------get all popular data in sort of popularity ------------
-    app.get('/popularity',async(req,res)=>{
-      const totalVotepipeline=[
+    app.get('/popularity', async (req, res) => {
+      const totalVotepipeline = [
         {
           $addFields: {
-          voteDifference: { $subtract: ["$upVote", "$downVote"] }
+            voteDifference: { $subtract: ["$upVote", "$downVote"] }
           }
-          },
-          {
+        },
+        {
           $sort: { voteDifference: -1 }
-          }
-        ]
-        const totalVoteResult= await postsCollection.aggregate(totalVotepipeline).toArray()
-        // console.log({totalVoteResult})
-        res.send(totalVoteResult)
-        // -------------------------------
-   
+        }
+      ]
+      const totalVoteResult = await postsCollection.aggregate(totalVotepipeline).toArray()
+      // console.log({totalVoteResult})
+      res.send(totalVoteResult)
+      // -------------------------------
+
     })
     // ---------------get specific user post from postsCollection ------------------
 
