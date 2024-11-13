@@ -43,7 +43,7 @@ async function run() {
     const postsCollection = db.collection('posts')
     const usersCollection = db.collection('users')
     const commentsCollection = db.collection('comments')
-    const voteCountsCollection = db.collection('voteCounts')
+ 
 
 
     // ----------------- get a post data details ----------------
@@ -55,7 +55,6 @@ async function run() {
       const result = await postsCollection.findOne(query)
       res.send(result)
     })
-
 
     // -------------------get all post from postsCollection db ---------------
     app.get('/posts', async (req, res) => {
@@ -73,12 +72,12 @@ async function run() {
             post_time_date: {
               $dateFromString: {
                 dateString: "$post_time",
-                format: "%d/%m/%Y"
+                format: "%m/%d/%Y"
               }
             },
           }
         },
-        // ---------------------------------------------
+       
         {
           $match: {
             $or: [
@@ -88,7 +87,7 @@ async function run() {
             ]
           }
         },
-        //  -------------------------------------------------------
+        
         {
           $sort: {
             post_time_date: -1,
@@ -116,27 +115,64 @@ async function run() {
           }
         },
 
+        // -------------for comment count ------------------
+    {
+      $lookup:{
+        from:'comments',
+        localField:'post_Title',
+        foreignField:'post_title',
+        as:'comments',
+      },
+    },
+    {
+      $addFields:{
+         comment_count:{$size:['$comments']}
+      }
+    },
+    {
+      $project:{
+        comments:0,
+      }
+    }
+  
 
-      ];
+     ];
 
-     
+    
+    
       const result = await postsCollection.aggregate(pipeline).toArray()
-      // const searchResult = await postsCollection.aggregate(searchPipeline).toArray()
 
       const totalCount = await postsCollection.countDocuments()
-
-      // console.log(result.length)
-
+      
       res.send({ result, totalCount })
-
-
     })
+    // ------------------------patch vote count in postsColllection----------------
+     app.patch('/posts/:id',async(req,res)=>{
+      const id=req.params.id;
+      const {action}=req.body
+      const query={_id:new ObjectId(id)}
+      
+
+      // const comment_count=await commentsCollection.countDocuments({post_Title:post_Title})
+
+      const updateDoc= action==='upVote'?{$inc:{upVote:1}}:{$inc:{downVote:1}}
+      const result=await postsCollection.updateOne(query,updateDoc)
+      res.send(result)
+     })
     // -------------------------store vote information in voteCountsCollection --------
 
    app.post('/voteCount',async(req,res)=>{
     const voteInfo=req.body;
     const result=await voteCountsCollection.insertOne(voteInfo)
     res.send(result) 
+   })
+  //  ---------------get specific comments data from comment---------
+
+   app.get('/comments/:postId',async(req,res)=>{
+    const {postId}=req.params ;
+    const query={postId:postId}
+    const result=await commentsCollection.find(query).toArray()
+    res.send(result)
    })
 
     // ----------------------------store comment data in commentsCollection ------------
@@ -163,7 +199,7 @@ async function run() {
       // -------------------------------
 
     })
-    // ---------------get specific user post from postsCollection ------------------
+    // ---------------get specific user posts from postsCollection ------------------
 
     app.get('/posts/:email', async (req, res) => {
       const email = req.params.email;
