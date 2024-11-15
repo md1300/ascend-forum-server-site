@@ -43,6 +43,7 @@ async function run() {
     const postsCollection = db.collection('posts')
     const usersCollection = db.collection('users')
     const commentsCollection = db.collection('comments')
+    const announcementsCollection = db.collection('announcements')
  
 
 
@@ -243,6 +244,22 @@ async function run() {
       const result = await usersCollection.findOne(query)
       res.send(result)
     })
+    // -------------------making users role admin  in a usersCollection db ---------
+    app.patch('/users/:id',async(req,res)=>{
+      const id=req.params.id;
+      const information=req.body
+      const filter={_id:new ObjectId(id)}
+      const updateDoc={
+        $set:{...information}
+      }
+      const result=await usersCollection.updateOne(filter,updateDoc)
+      res.send(result)
+    })
+    // ------------------get all users data from usersCollection db ---------------
+    app.get('/users',async(req,res)=>{
+      const result=await usersCollection.find().toArray()
+      res.send(result)
+    })
 
     //  ------------ post users information in usersCollection db ------------
 
@@ -258,6 +275,29 @@ async function run() {
       const result = await usersCollection.updateOne(query, updateDoc, options)
       res.send(result)
     })
+    // -----------------get all announcements from announcementsCollection ------------------
+    app.get('/announcements',async(req,res)=>{
+      const result=await announcementsCollection.find().toArray()
+      const totalAnnouncement= await announcementsCollection.estimatedDocumentCount()
+      res.send({result,totalAnnouncement})
+    })
+    // ----------------- get specific announcement data from announcentsCollection ----------------------
+
+    app.get('/announcements/:id',async(req,res)=>{
+      const id=req.params.id;
+      // console.log({id})
+      const query={_id:new ObjectId(id)}     
+      const result =await announcementsCollection.findOne(query)
+      res.send(result)
+    })
+
+    // -----------------announcementscollection to save announcement data --------------------
+    app.post('/announcements',async(req,res)=>{
+      const announcementInfo=req.body;
+      const result=await announcementsCollection.insertOne(announcementInfo)
+      res.send(result)
+    })
+
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
