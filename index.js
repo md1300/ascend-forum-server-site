@@ -45,7 +45,7 @@ async function run() {
     const commentsCollection = db.collection('comments')
     const announcementsCollection = db.collection('announcements')
     const feedbacksCollection = db.collection('feedbacks')
- 
+
 
 
     // ----------------- get a post data details ----------------
@@ -79,17 +79,17 @@ async function run() {
             },
           }
         },
-       
+
         {
           $match: {
             $or: [
               { category: { $regex: search, $options: 'i' } },
-                                            
+
 
             ]
           }
         },
-        
+
         {
           $sort: {
             post_time_date: -1,
@@ -112,87 +112,87 @@ async function run() {
           $match: {
             $or: [
               { category: { $regex: category, $options: 'i' } },
-              
+
             ]
           }
         },
 
         // -------------for comment count ------------------
-    {
-      $lookup:{
-        from:'comments',
-        localField:'post_Title',
-        foreignField:'post_title',
-        as:'comments',
-      },
-    },
-    {
-      $addFields:{
-         comment_count:{$size:['$comments']}
-      }
-    },
-    {
-      $project:{
-        comments:0,
-      }
-    }
-  
+        {
+          $lookup: {
+            from: 'comments',
+            localField: 'post_Title',
+            foreignField: 'post_title',
+            as: 'comments',
+          },
+        },
+        {
+          $addFields: {
+            comment_count: { $size: ['$comments'] }
+          }
+        },
+        {
+          $project: {
+            comments: 0,
+          }
+        }
 
-     ];
 
-    
-    
+      ];
+
+
+
       const result = await postsCollection.aggregate(pipeline).toArray()
 
       const totalCount = await postsCollection.countDocuments()
-      
+
       res.send({ result, totalCount })
     })
     // ------------------------patch vote count in postsColllection----------------
-     app.patch('/posts/:id',async(req,res)=>{
-      const id=req.params.id;
-      const {action}=req.body
-      const query={_id:new ObjectId(id)}
-      
+    app.patch('/posts/:id', async (req, res) => {
+      const id = req.params.id;
+      const { action } = req.body
+      const query = { _id: new ObjectId(id) }
+
 
       // const comment_count=await commentsCollection.countDocuments({post_Title:post_Title})
 
-      const updateDoc= action==='upVote'?{$inc:{upVote:1}}:{$inc:{downVote:1}}
-      const result=await postsCollection.updateOne(query,updateDoc)
+      const updateDoc = action === 'upVote' ? { $inc: { upVote: 1 } } : { $inc: { downVote: 1 } }
+      const result = await postsCollection.updateOne(query, updateDoc)
       res.send(result)
-     })
+    })
     // -------------------------store vote information in voteCountsCollection --------
 
-   app.post('/voteCount',async(req,res)=>{
-    const voteInfo=req.body;
-    const result=await voteCountsCollection.insertOne(voteInfo)
-    res.send(result) 
-   })
-  //  ---------------get specific comments data from comment---------
+    app.post('/voteCount', async (req, res) => {
+      const voteInfo = req.body;
+      const result = await voteCountsCollection.insertOne(voteInfo)
+      res.send(result)
+    })
+    //  ---------------get specific comments data from comment---------
 
-   app.get('/comments/:postId',async(req,res)=>{
-    const {postId}=req.params ;
-    const query={postId:postId}
-    const result=await commentsCollection.find(query).toArray()
-    res.send(result)
-   })
+    app.get('/comments/:postId', async (req, res) => {
+      const { postId } = req.params;
+      const query = { postId: postId }
+      const result = await commentsCollection.find(query).toArray()
+      res.send(result)
+    })
 
-  //  -------------------delete specific comment data from commentsCollection ------------
-  app.delete('/comment/:id',async(req,res)=>{
-    const id =req.params.id;
-    // console.log(id)
-    const query={_id:new ObjectId(id)}
-    // console.log(query)
-    const result=await commentsCollection.deleteOne(query)
-    // console.log(result)
-    res.send(result)
-  })
+    //  -------------------delete specific comment data from commentsCollection ------------
+    app.delete('/comment/:id', async (req, res) => {
+      const id = req.params.id;
+      // console.log(id)
+      const query = { _id: new ObjectId(id) }
+      // console.log(query)
+      const result = await commentsCollection.deleteOne(query)
+      // console.log(result)
+      res.send(result)
+    })
 
     // ----------------------------store comment data in commentsCollection ------------
-    app.post('/comment',async(req,res)=>{        
-         const commentData=req.body ;        
-         const result=await commentsCollection.insertOne(commentData)
-         res.send(result)
+    app.post('/comment', async (req, res) => {
+      const commentData = req.body;
+      const result = await commentsCollection.insertOne(commentData)
+      res.send(result)
     })
     // ---------------get all popular data in sort of popularity ------------
     app.get('/popularity', async (req, res) => {
@@ -257,20 +257,38 @@ async function run() {
       res.send(result)
     })
     // -------------------making users role admin  in a usersCollection db ---------
-    app.patch('/users/:id',async(req,res)=>{
-      const id=req.params.id;
-      const information=req.body
-      const filter={_id:new ObjectId(id)}
-      const updateDoc={
-        $set:{...information}
+    app.patch('/users/:id', async (req, res) => {
+      const id = req.params.id;
+      const information = req.body
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: { ...information }
       }
-      const result=await usersCollection.updateOne(filter,updateDoc)
+      const result = await usersCollection.updateOne(filter, updateDoc)
       res.send(result)
     })
     // ------------------get all users data from usersCollection db ---------------
-    app.get('/users',async(req,res)=>{
-      const result=await usersCollection.find().toArray()
-      res.send(result)
+    app.get('/users', async (req, res) => {
+      const search  = req.query.search || '';
+     let pipeline=[]
+      if(search){
+        pipeline.push({
+          $match: {
+            $or: [
+              { name: { $regex: search, $options: 'i' } }
+            ]
+          }
+        });
+      }
+      try{
+        const result=await usersCollection.aggregate(pipeline).toArray()
+        console.log(result)
+        res.send(result)
+      }
+      catch(error){
+        console.log(error.message)
+      }
+      
     })
 
     //  ------------ post users information in usersCollection db ------------
@@ -288,51 +306,51 @@ async function run() {
       res.send(result)
     })
     // -----------------get all announcements from announcementsCollection ------------------
-    app.get('/announcements',async(req,res)=>{
-      const result=await announcementsCollection.find().toArray()
-      const totalAnnouncement= await announcementsCollection.estimatedDocumentCount()
-      res.send({result,totalAnnouncement})
+    app.get('/announcements', async (req, res) => {
+      const result = await announcementsCollection.find().toArray()
+      const totalAnnouncement = await announcementsCollection.estimatedDocumentCount()
+      res.send({ result, totalAnnouncement })
     })
     // ----------------- get specific announcement data from announcentsCollection ----------------------
 
-    app.get('/announcements/:id',async(req,res)=>{
-      const id=req.params.id;
+    app.get('/announcements/:id', async (req, res) => {
+      const id = req.params.id;
       // console.log({id})
-      const query={_id:new ObjectId(id)}     
-      const result =await announcementsCollection.findOne(query)
+      const query = { _id: new ObjectId(id) }
+      const result = await announcementsCollection.findOne(query)
       res.send(result)
     })
 
     // -----------------announcementscollection to save announcement data --------------------
-    app.post('/announcements',async(req,res)=>{
-      const announcementInfo=req.body;
-      const result=await announcementsCollection.insertOne(announcementInfo)
+    app.post('/announcements', async (req, res) => {
+      const announcementInfo = req.body;
+      const result = await announcementsCollection.insertOne(announcementInfo)
       res.send(result)
     })
     // -------------------- get feedback data --------------------------
-    app.get('/feedback',async(req,res)=>{
-      const result=await feedbacksCollection.find().toArray()
+    app.get('/feedback', async (req, res) => {
+      const result = await feedbacksCollection.find().toArray()
       res.send(result)
     })
 
     // ---------------------post data in feedbacksCollection ------------------------------
-    app.post('/feedback',async(req,res)=>{
-      const feedbackData=req.body;
-      const result=await feedbacksCollection.insertOne(feedbackData)
+    app.post('/feedback', async (req, res) => {
+      const feedbackData = req.body;
+      const result = await feedbacksCollection.insertOne(feedbackData)
       res.send(result)
     })
 
     // -------------------report specific comment in feedbacksCollection -------------------
-    app.patch('/feedback/:id',async(req,res)=>{
-      const id=req.params.id;
-      const reportData=req.body;
-      const filter={commentId:id}
-      const updateReport={
-        $set:{
+    app.patch('/feedback/:id', async (req, res) => {
+      const id = req.params.id;
+      const reportData = req.body;
+      const filter = { commentId: id }
+      const updateReport = {
+        $set: {
           ...reportData
         }
       }
-      const result=await feedbacksCollection.updateOne(filter,updateReport)
+      const result = await feedbacksCollection.updateOne(filter, updateReport)
       res.send(result)
     })
 
