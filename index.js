@@ -177,6 +177,17 @@ async function run() {
     res.send(result)
    })
 
+  //  -------------------delete specific comment data from commentsCollection ------------
+  app.delete('/comment/:id',async(req,res)=>{
+    const id =req.params.id;
+    // console.log(id)
+    const query={_id:new ObjectId(id)}
+    // console.log(query)
+    const result=await commentsCollection.deleteOne(query)
+    // console.log(result)
+    res.send(result)
+  })
+
     // ----------------------------store comment data in commentsCollection ------------
     app.post('/comment',async(req,res)=>{        
          const commentData=req.body ;        
@@ -296,6 +307,11 @@ async function run() {
     app.post('/announcements',async(req,res)=>{
       const announcementInfo=req.body;
       const result=await announcementsCollection.insertOne(announcementInfo)
+      res.send(result)
+    })
+    // -------------------- get feedback data --------------------------
+    app.get('/feedback',async(req,res)=>{
+      const result=await feedbacksCollection.find().toArray()
       res.send(result)
     })
 
