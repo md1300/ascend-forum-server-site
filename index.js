@@ -44,6 +44,7 @@ async function run() {
     const usersCollection = db.collection('users')
     const commentsCollection = db.collection('comments')
     const announcementsCollection = db.collection('announcements')
+    const feedbacksCollection = db.collection('feedbacks')
  
 
 
@@ -298,6 +299,26 @@ async function run() {
       res.send(result)
     })
 
+    // ---------------------post data in feedbacksCollection ------------------------------
+    app.post('/feedback',async(req,res)=>{
+      const feedbackData=req.body;
+      const result=await feedbacksCollection.insertOne(feedbackData)
+      res.send(result)
+    })
+
+    // -------------------report specific comment in feedbacksCollection -------------------
+    app.patch('/feedback/:id',async(req,res)=>{
+      const id=req.params.id;
+      const reportData=req.body;
+      const filter={commentId:id}
+      const updateReport={
+        $set:{
+          ...reportData
+        }
+      }
+      const result=await feedbacksCollection.updateOne(filter,updateReport)
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
