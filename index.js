@@ -1,7 +1,10 @@
 const express = require('express')
 require('dotenv').config()
 const cors = require('cors')
+const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion, Timestamp, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken')
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const app = express()
 const port = process.env.PORT || 8000
 
@@ -14,15 +17,36 @@ const corsOption = {
   optionSuccessStatus: 200,
 }
 
-app.use(express.json())
 app.use(cors(corsOption))
+app.use(cookieParser());
+app.use(express.json())
+
+
 
 app.get('/', (req, res) => {
   res.send('Server is running')
 })
 
-
-
+// verify jwt middleware -----------
+const verifyToken=(req,res,next)=>{
+  const token=req?.cookies?.token;
+  // console.log(token)
+  if(!token) return res.status(401).send({message:'token do not get, unauthorized access'})
+  if(token){
+    
+    jwt.verify(token,process.env.ACCESS_TOKEN_SECRET,(error,decoded)=>{
+      if(error){
+        console.log(error)
+        return res.status(401).send({message:'unauthorized access for verify'})
+      }
+      // console.log(decoded)
+      req.user=decoded ;
+      next()
+    })
+  }
+  // console.log(token)
+  
+}
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.vmhty.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -37,7 +61,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // ---------------- collection -------------------
     const db = client.db('ascend_forum')
     const postsCollection = db.collection('posts')
@@ -46,6 +70,56 @@ async function run() {
     const announcementsCollection = db.collection('announcements')
     const feedbacksCollection = db.collection('feedbacks')
 
+
+    // auth related api
+    app.post('/jwt', async (req, res) => {
+      const user = req.body
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '365d',
+      })
+      // console.log(token)
+      res
+        .cookie('token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        })
+        .send({ success: true })
+    })
+
+    // Logout
+    app.get('/logout', async (req, res) => {
+      try {
+        res
+          .clearCookie('token', {
+            maxAge: 0,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+          })
+          .send({ success: true })
+        // console.log('Logout successful')
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+
+      // create-payment-intent
+      app.post('/create-payment-intent',  async (req, res) => {
+        const price = req.body.price;
+        const priceInCent = parseFloat(price) * 100;
+  
+        if (!price || priceInCent < 1) return
+        // Create a PaymentIntent with the order amount and currency
+        const { client_secret } = await stripe.paymentIntents.create({
+          amount: priceInCent,
+          currency: "usd",
+          // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+          automatic_payment_methods: {
+            enabled: true,
+          },
+        })
+        res.send({ clientSecret: client_secret })
+      })
 
 
     // ----------------- get a post data details ----------------
@@ -214,7 +288,7 @@ async function run() {
     })
     // ---------------get specific user posts from postsCollection ------------------
 
-    app.get('/posts/:email', async (req, res) => {
+    app.get('/posts/:email',  async (req, res) => {
       const email = req.params.email;
       const query = { 'author.email': email }
       const pipeline = [
@@ -250,7 +324,7 @@ async function run() {
 
     //  ------------ get users information from usersColllection db ----------
 
-    app.get('/users/:email', async (req, res) => {
+    app.get('/users/:email',verifyToken,  async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const result = await usersCollection.findOne(query)
@@ -282,13 +356,28 @@ async function run() {
       }
       try{
         const result=await usersCollection.aggregate(pipeline).toArray()
-        console.log(result)
+        // console.log(result)
         res.send(result)
       }
       catch(error){
         console.log(error.message)
       }
       
+    })
+
+    // -------------- change users status --------------------------
+
+    app.patch('/users/status/:email',async(req,res)=>{
+      const email=req.params.email;
+      const status=req.body
+      const filter={email:email}
+      const updateDoc={
+        $set:{
+          ...status
+        }
+      }
+      const result=await usersCollection.updateOne(filter,updateDoc)
+      res.send(result)
     })
 
     //  ------------ post users information in usersCollection db ------------
